@@ -14,12 +14,14 @@ class AddTransactionScreen extends StatefulWidget {
 
 class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final _formKey = GlobalKey<FormState>();
-  List<Map<String, dynamic>> _customers = [];
+
+  // 👉 CUSTOMER INPUT MANUAL
+  final TextEditingController _customerController = TextEditingController();
+
   List<Product> _products = [];
 
-  String? _selectedCustomerId;
   Product? _selectedProduct;
-  int? _quantity;
+  int _quantity = 1;
   DateTime _selectedDate = DateTime.now();
 
   bool _loading = true;
@@ -38,10 +40,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     });
 
     try {
-      final customers = await ApiService.fetchCustomers();
       final products = await ApiService.fetchProducts();
       setState(() {
-        _customers = customers;
         _products = products;
         _loading = false;
       });
@@ -51,14 +51,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         _loading = false;
       });
     }
-  }
-
-  String _extractCustomerId(Map<String, dynamic> m) {
-    return (m['id'] ?? m['customer_id'] ?? m['customerId'] ?? m['code'] ?? m['uid'] ?? m['key'] ?? '').toString();
-  }
-
-  String _extractCustomerLabel(Map<String, dynamic> m) {
-    return (m['name'] ?? m['customer_name'] ?? m['full_name'] ?? m['label'] ?? m['title'] ?? _extractCustomerId(m)).toString();
   }
 
   Future<void> _pickDate() async {
@@ -77,33 +69,47 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedCustomerId == null || _selectedProduct == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select customer and product')));
+
+    if (_selectedProduct == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Product wajib dipilih')),
+      );
       return;
     }
 
-    _formKey.currentState!.save();
-
     final sale = Sale(
-      customerId: _selectedCustomerId!,
+      customerId: _customerController.text.trim(),
       productId: _selectedProduct!.id.toString(),
-      quantity: _quantity ?? 1,
+      quantity: _quantity,
       date: DateFormat('yyyy-MM-dd').format(_selectedDate),
     );
 
     try {
       final ok = await ApiService.createSale(sale);
       if (!mounted) return;
+
       if (ok) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sale created')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Transaksi berhasil')),
+        );
         Navigator.of(context).pop(true);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to create sale')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal membuat transaksi')),
+        );
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
     }
+  }
+
+  @override
+  void dispose() {
+    _customerController.dispose();
+    super.dispose();
   }
 
   @override
@@ -115,68 +121,102 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           : _error != null
               ? Center(child: Text('Error: $_error'))
               : SingleChildScrollView(
-                  padding: const EdgeInsets.all(12.0),
+                  padding: const EdgeInsets.all(12),
                   child: Card(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     elevation: 1,
                     child: Padding(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.all(16),
                       child: Form(
                         key: _formKey,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            DropdownButtonFormField<String>(
-                              decoration: InputDecoration(labelText: 'Customer', filled: true),
-                              items: _customers.map((c) {
-                                final id = _extractCustomerId(c);
-                                final label = _extractCustomerLabel(c);
-                                return DropdownMenuItem(value: id, child: Text(label));
-                              }).toList(),
-                              initialValue: _selectedCustomerId,
-                              onChanged: (v) => setState(() => _selectedCustomerId = v),
-                              validator: (v) => v == null || v.isEmpty ? 'Select customer' : null,
+                            // ================= CUSTOMER INPUT =================
+                            TextFormField(
+                              controller: _customerController,
+                              decoration: const InputDecoration(
+                                labelText: 'Customer ID / Name',
+                                hintText: 'Contoh: CG-12520 atau Budi',
+                                filled: true,
+                              ),
+                              validator: (v) => v == null || v.isEmpty
+                                  ? 'Customer wajib diisi'
+                                  : null,
                             ),
 
                             const SizedBox(height: 12),
 
+                            // ================= PRODUCT =================
                             DropdownButtonFormField<Product>(
-                              decoration: InputDecoration(labelText: 'Product', filled: true),
-                              items: _products.map((p) => DropdownMenuItem(value: p, child: Text(p.productName))).toList(),
-                              initialValue: _selectedProduct,
-                              onChanged: (v) => setState(() => _selectedProduct = v),
-                              validator: (v) => v == null ? 'Select product' : null,
+                              decoration: const InputDecoration(
+                                labelText: 'Product',
+                                filled: true,
+                              ),
+                              value: _selectedProduct,
+                              items: _products
+                                  .map(
+                                    (p) => DropdownMenuItem<Product>(
+                                      value: p,
+                                      child: Text(p.productName),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (v) =>
+                                  setState(() => _selectedProduct = v),
+                              validator: (v) =>
+                                  v == null ? 'Pilih product' : null,
                             ),
 
                             const SizedBox(height: 12),
 
+                            // ================= QUANTITY =================
                             TextFormField(
                               initialValue: '1',
-                              decoration: const InputDecoration(labelText: 'Quantity', hintText: '1', filled: true),
+                              decoration: const InputDecoration(
+                                labelText: 'Quantity',
+                                filled: true,
+                              ),
                               keyboardType: TextInputType.number,
                               validator: (v) {
-                                if (v == null || v.isEmpty) return 'Enter quantity';
-                                final n = int.tryParse(v);
-                                if (n == null || n <= 0) return 'Enter a valid quantity';
+                                final n = int.tryParse(v ?? '');
+                                if (n == null || n <= 0) {
+                                  return 'Quantity tidak valid';
+                                }
                                 return null;
                               },
-                              onSaved: (v) => _quantity = int.tryParse(v ?? '1') ?? 1,
+                              onChanged: (v) =>
+                                  _quantity = int.tryParse(v) ?? 1,
                             ),
 
                             const SizedBox(height: 12),
 
+                            // ================= DATE =================
                             Row(
                               children: [
-                                Expanded(child: Text('Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}')),
-                                FilledButton.tonal(onPressed: _pickDate, child: const Text('Pick Date')),
+                                Expanded(
+                                  child: Text(
+                                    'Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}',
+                                  ),
+                                ),
+                                FilledButton.tonal(
+                                  onPressed: _pickDate,
+                                  child: const Text('Pick Date'),
+                                ),
                               ],
                             ),
 
                             const SizedBox(height: 20),
 
+                            // ================= SUBMIT =================
                             SizedBox(
                               width: double.infinity,
-                              child: FilledButton(onPressed: _submit, child: const Text('Submit')),
+                              child: FilledButton(
+                                onPressed: _submit,
+                                child: const Text('Submit'),
+                              ),
                             ),
                           ],
                         ),
