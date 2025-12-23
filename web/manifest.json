@@ -1,6 +1,6 @@
 {
-    "name": "frontend_retail",
-    "short_name": "frontend_retail",
+    "name": "uas_psmbi",
+    "short_name": "uas_psmbi",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
