@@ -1,6 +1,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Network (API calls) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Camera (barcode scanner) -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Android 13+ notification runtime permission (only needed if you show OS notifications) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
     <application
-        android:label="frontend_retail"
+        android:label="UAS PSM BI"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
